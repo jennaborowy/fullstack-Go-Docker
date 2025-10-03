@@ -29,6 +29,7 @@ func (r *ListRepository) CreateList(title string) (int64, error) {
 	}
 
 	id, err := res.LastInsertId()
+
 	if err != nil {
 		return 0, fmt.Errorf("failed to retrieve last insert ID: %w", err)
 	}
@@ -86,7 +87,7 @@ func (r *ListRepository) GetAllLists() ([]models.List, error) {
 }
 
 // UpdateList updates the title of a list
-func (r *ListRepository) UpdateList(id int, title string) error {
+func (r *ListRepository) UpdateTitle(id int, title string) error {
 	res, err := r.db.Exec("UPDATE lists SET title = ? WHERE id = ?", title, id)
 	if err != nil {
 		return fmt.Errorf("failed to update list: %w", err)

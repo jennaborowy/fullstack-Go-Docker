@@ -1,6 +1,8 @@
 // handlers package processes requests through the repositories
 package handlers
 
+// Note: should probably update to do more of the JSON binding
+
 import (
 	"net/http"
 	"strconv"
@@ -81,24 +83,36 @@ func (h *ItemHandler) DeleteItem(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
-// CreateItem attempts to create a new item and returns its id
+// CreateItem attempts to create a new item and returns its ID
 func (h *ItemHandler) CreateItem(c *gin.Context) {
-	title := c.Param("title")
-	content := c.Param("content")
-	dateStr := c.Param("date")
+	var input struct {
+		Title   string `json:"title"`
+		Content string `json:"content"`
+		Date    string `json:"date"`
+		ListID  int    `json:"list_id"`
+	}
 
-	date, err := time.Parse("2006-01-02", dateStr)
+	// Bind JSON payload into input struct
+	if err := c.BindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		return
+	}
+
+	// Parse date string into time.Time
+	date, err := time.Parse("2006-01-02", input.Date)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid date format"})
 		return
 	}
 
-	id, err := h.repo.CreateItem(title, date, content)
+	// Call repository to create the item
+	id, err := h.repo.CreateItem(input.Title, date, input.Content, input.ListID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
+	// Return the newly created ID
 	c.JSON(http.StatusCreated, gin.H{"id": id})
 }
 

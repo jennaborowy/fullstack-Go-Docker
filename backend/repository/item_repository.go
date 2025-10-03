@@ -90,8 +90,8 @@ func (r *ItemRepository) DeleteItemByID(id int) error {
 }
 
 // CreateItem creates a new item with title, date, and content
-func (r *ItemRepository) CreateItem(title string, date time.Time, content string) (int64, error) {
-	res, err := r.db.Exec("INSERT INTO items (title, date, content) VALUES (?, ?, ?)", title, date, content)
+func (r *ItemRepository) CreateItem(title string, date time.Time, content string, listID int) (int64, error) {
+	res, err := r.db.Exec("INSERT INTO items (title, date, content, list_id) VALUES (?, ?, ?, ?)", title, date, content, listID)
 	if err != nil {
 		return 0, fmt.Errorf("failed to create new item: %w", err)
 	}

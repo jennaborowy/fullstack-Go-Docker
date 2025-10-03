@@ -4,6 +4,7 @@ package repository
 import (
 	"database/sql"
 	"fmt"
+	"time"
 
 	"github.com/jennaborowy/fullstack-Go-Docker/models"
 )
@@ -41,8 +42,8 @@ func (r *ListRepository) CreateList(title string) (int64, error) {
 func (r *ListRepository) GetList(id int) (*models.List, error) {
 	list := &models.List{}
 	// Get the list info
-	row := r.db.QueryRow("SELECT id, title FROM lists WHERE id = ?", id)
-	if err := row.Scan(&list.ID, &list.Title); err != nil {
+	row := r.db.QueryRow("SELECT id, title, created_at, updated_at FROM lists WHERE id = ?", id)
+	if err := row.Scan(&list.ID, &list.Title, &list.CreatedAt, &list.UpdatedAt); err != nil {
 		if err == sql.ErrNoRows {
 			return nil, fmt.Errorf("list not found")
 		}
@@ -50,7 +51,7 @@ func (r *ListRepository) GetList(id int) (*models.List, error) {
 	}
 
 	// Get items for this list
-	itemsRows, err := r.db.Query("SELECT id, title, date, content, list_id FROM items WHERE list_id = ?", id)
+	itemsRows, err := r.db.Query("SELECT id, title, date, content, list_id, created_at, updated_at FROM items WHERE list_id = ?", id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query items: %w", err)
 	}
@@ -58,7 +59,7 @@ func (r *ListRepository) GetList(id int) (*models.List, error) {
 
 	for itemsRows.Next() {
 		var item models.Item
-		if err := itemsRows.Scan(&item.ID, &item.Title, &item.Date, &item.Content, &item.ListID); err != nil {
+		if err := itemsRows.Scan(&item.ID, &item.Title, &item.Date, &item.Content, &item.ListID, &item.CreatedAt, &item.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("failed to scan item: %w", err)
 		}
 		list.Items = append(list.Items, item)
@@ -69,7 +70,7 @@ func (r *ListRepository) GetList(id int) (*models.List, error) {
 
 // GetAllLists retrieves all lists without their items
 func (r *ListRepository) GetAllLists() ([]models.List, error) {
-	rows, err := r.db.Query("SELECT id, title FROM lists")
+	rows, err := r.db.Query("SELECT id, title, created_at, updated_at FROM lists")
 	if err != nil {
 		return nil, fmt.Errorf("failed to query lists: %w", err)
 	}
@@ -78,7 +79,7 @@ func (r *ListRepository) GetAllLists() ([]models.List, error) {
 	lists := []models.List{}
 	for rows.Next() {
 		var l models.List
-		if err := rows.Scan(&l.ID, &l.Title); err != nil {
+		if err := rows.Scan(&l.ID, &l.Title, &l.CreatedAt, &l.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("failed to scan list: %w", err)
 		}
 		lists = append(lists, l)
@@ -88,7 +89,7 @@ func (r *ListRepository) GetAllLists() ([]models.List, error) {
 
 // UpdateList updates the title of a list
 func (r *ListRepository) UpdateTitle(id int, title string) error {
-	res, err := r.db.Exec("UPDATE lists SET title = ? WHERE id = ?", title, id)
+	res, err := r.db.Exec("UPDATE lists SET title = ?, updated_at = ? WHERE id = ?", title, time.Now(), id)
 	if err != nil {
 		return fmt.Errorf("failed to update list: %w", err)
 	}

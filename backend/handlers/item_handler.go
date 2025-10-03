@@ -86,12 +86,10 @@ func (h *ItemHandler) DeleteItem(c *gin.Context) {
 // CreateItem attempts to create a new item and returns its ID
 func (h *ItemHandler) CreateItem(c *gin.Context) {
 	var input struct {
-		Title     string `json:"title"`
-		Content   string `json:"content"`
-		Date      string `json:"date"`
-		ListID    int    `json:"list_id"`
-		CreatedAt string `json:"created_at"`
-		UpdatedAt string `json:"updated_at"`
+		Title   string `json:"title"`
+		Content string `json:"content"`
+		Date    string `json:"date"`
+		ListID  int    `json:"list_id"`
 	}
 
 	// Bind JSON payload into input struct

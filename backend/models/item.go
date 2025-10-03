@@ -7,4 +7,5 @@ type Item struct {
 	Title   string
 	Date    time.Time
 	Content string
+	ListID  int
 }

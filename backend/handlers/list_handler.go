@@ -2,11 +2,11 @@
 package handlers
 
 import (
+	"log"
 	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
-	"github.com/jennaborowy/fullstack-Go-Docker/models"
 	"github.com/jennaborowy/fullstack-Go-Docker/repository"
 )
 
@@ -33,7 +33,10 @@ func (h *ListHandler) GetLists(c *gin.Context) {
 // GetList returns a single list, optionally with its items
 func (h *ListHandler) GetList(c *gin.Context) {
 	idStr := c.Param("id")
+	log.Printf("Received id param: '%s'\n", idStr) // <-- add this
+
 	id, err := strconv.Atoi(idStr)
+
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid list ID"})
 		return
@@ -59,15 +62,10 @@ func (h *ListHandler) CreateList(c *gin.Context) {
 		return
 	}
 
-	id, err := h.repo.CreateList(input.Title)
+	list, err := h.repo.CreateList(input.Title)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
-	}
-
-	list := &models.List{
-		ID:    id,
-		Title: input.Title,
 	}
 
 	c.JSON(http.StatusCreated, list)
@@ -77,6 +75,7 @@ func (h *ListHandler) CreateList(c *gin.Context) {
 func (h *ListHandler) UpdateListTitle(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.Atoi(idStr)
+
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid list ID"})
 		return
@@ -90,12 +89,13 @@ func (h *ListHandler) UpdateListTitle(c *gin.Context) {
 		return
 	}
 
-	if err := h.repo.UpdateTitle(id, input.Title); err != nil {
+	updatedList, err := h.repo.UpdateTitle(id, input.Title)
+	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.Status(http.StatusNoContent)
+	c.JSON(http.StatusOK, updatedList)
 }
 
 // DeleteList deletes a list by ID

@@ -51,21 +51,21 @@ func (h *ItemHandler) GetItem(c *gin.Context) {
 }
 
 // GetItemFromList attempts to get a single item by the list it is in
-func (h *ItemHandler) GetItemFromList(c *gin.Context) {
-	listID, err := strconv.Atoi(c.Param("list_id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid list_id"})
-		return
-	}
+// func (h *ItemHandler) GetItemFromList(c *gin.Context) {
+// 	listID, err := strconv.Atoi(c.Param("list_id"))
+// 	if err != nil {
+// 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid list_id"})
+// 		return
+// 	}
 
-	item, err := h.repo.GetByListID(listID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
+// 	item, err := h.repo.GetByListID(listID)
+// 	if err != nil {
+// 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+// 		return
+// 	}
 
-	c.JSON(http.StatusOK, item)
-}
+// 	c.JSON(http.StatusOK, item)
+// }
 
 // DeleteItem attempts to delete an item by id and returns no content
 func (h *ItemHandler) DeleteItem(c *gin.Context) {
@@ -86,34 +86,30 @@ func (h *ItemHandler) DeleteItem(c *gin.Context) {
 // CreateItem attempts to create a new item and returns its ID
 func (h *ItemHandler) CreateItem(c *gin.Context) {
 	var input struct {
-		Title   string `json:"title"`
-		Content string `json:"content"`
-		Date    string `json:"date"`
-		ListID  int    `json:"list_id"`
+		Title    string `json:"title"`
+		Content  string `json:"content"`
+		ItemDate string `json:"item_date"`
+		ListID   int    `json:"list_id"`
 	}
 
-	// Bind JSON payload into input struct
-	if err := c.BindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	// Parse date string into time.Time
-	date, err := time.Parse("2006-01-02", input.Date)
+	itemDate, err := time.Parse("2006-01-02", input.ItemDate)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid date format"})
 		return
 	}
 
-	// Call repository to create the item
-	id, err := h.repo.CreateItem(input.Title, date, input.Content, input.ListID)
+	item, err := h.repo.CreateItem(input.Title, itemDate, input.Content, input.ListID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	// Return the newly created ID
-	c.JSON(http.StatusCreated, gin.H{"id": id})
+	c.JSON(http.StatusCreated, item)
 }
 
 // UpdateItem attempts to edit an item's information and returns the updated item

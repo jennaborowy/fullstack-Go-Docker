@@ -21,7 +21,7 @@ func NewItemRepository(db *sql.DB) *ItemRepository {
 
 // GetAll retrieves all existing items from database
 func (r *ItemRepository) GetAll() ([]models.Item, error) {
-	rows, err := r.db.Query("SELECT id, title, date, content, list_id, created_at, updated_at FROM items")
+	rows, err := r.db.Query("SELECT id, title, item_date, content, list_id, created_at, updated_at FROM items")
 	if err != nil {
 		return nil, err
 	}
@@ -41,7 +41,7 @@ func (r *ItemRepository) GetAll() ([]models.Item, error) {
 
 // GetByID retrieves a single item by its ID
 func (r *ItemRepository) GetByID(id int) (*models.Item, error) {
-	row := r.db.QueryRow("SELECT id, title, date, content, list_id, created_at, updated_at FROM items WHERE id = ?", id)
+	row := r.db.QueryRow("SELECT id, title, item_date, content, list_id, created_at, updated_at FROM items WHERE id = $1", id)
 
 	var item models.Item
 	err := row.Scan(&item.ID, &item.Title, &item.Date, &item.Content, &item.ListID, &item.CreatedAt, &item.UpdatedAt)
@@ -56,23 +56,23 @@ func (r *ItemRepository) GetByID(id int) (*models.Item, error) {
 }
 
 // GetItemsByListID gets an item by the list it is in
-func (r *ItemRepository) GetByListID(listID int) (*models.Item, error) {
-	row := r.db.QueryRow("SELECT id, title, date, content, list_id, created_at, updated_at FROM items WHERE list_id = ?", listID)
-	var item models.Item
-	err := row.Scan(&item.ID, &item.Title, &item.Date, &item.Content, &item.ListID, &item.CreatedAt, &item.UpdatedAt)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil, fmt.Errorf("item not found")
-		}
-		return nil, err
-	}
+// func (r *ItemRepository) GetByListID(listID int) (*models.Item, error) {
+// 	row := r.db.QueryRow("SELECT id, title, date, content, list_id, created_at, updated_at FROM items WHERE list_id = ?", listID)
+// 	var item models.Item
+// 	err := row.Scan(&item.ID, &item.Title, &item.Date, &item.Content, &item.ListID, &item.CreatedAt, &item.UpdatedAt)
+// 	if err != nil {
+// 		if err == sql.ErrNoRows {
+// 			return nil, fmt.Errorf("item not found")
+// 		}
+// 		return nil, err
+// 	}
 
-	return &item, nil
-}
+// 	return &item, nil
+// }
 
 // DeleteItemByID deletes an item by ID
 func (r *ItemRepository) DeleteItemByID(id int) error {
-	res, err := r.db.Exec("DELETE FROM items WHERE id = ?", id)
+	res, err := r.db.Exec("DELETE FROM items WHERE id = $1", id)
 	if err != nil {
 		return fmt.Errorf("failed to delete item: %w", err)
 	}
@@ -90,23 +90,23 @@ func (r *ItemRepository) DeleteItemByID(id int) error {
 }
 
 // CreateItem creates a new item with title, date, and content
-func (r *ItemRepository) CreateItem(title string, date time.Time, content string, listID int) (int64, error) {
-	res, err := r.db.Exec("INSERT INTO items (title, date, content, list_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)", title, date, content, listID, time.Now(), time.Now())
+func (r *ItemRepository) CreateItem(title string, date time.Time, content string, listID int) (*models.Item, error) {
+	item := &models.Item{}
+	err := r.db.QueryRow(
+		"INSERT INTO items (title, content, item_date, list_id) VALUES ($1, $2, $3, $4) RETURNING id",
+		title, content, date, listID,
+	).Scan(&item.ID)
+
 	if err != nil {
-		return 0, fmt.Errorf("failed to create new item: %w", err)
+		return nil, fmt.Errorf("could not obtain new id: %w", err)
 	}
 
-	id, err := res.LastInsertId()
-	if err != nil {
-		return 0, fmt.Errorf("could not obtain new id: %d", id)
-	}
-
-	return id, nil
+	return item, nil
 }
 
 // UpdateItem updates an item's title, date, and/or content
 func (r *ItemRepository) UpdateItem(id int, title string, date time.Time, content string) error {
-	res, err := r.db.Exec("UPDATE items Set title = ?, date = ?, content = ?, updated_at = ? WHERE id = ?", title, date, content, time.Now(), id)
+	res, err := r.db.Exec("UPDATE items Set title = $1, item_date = $2, content = $3, updated_at = $4 WHERE id = ?", title, date, content, time.Now(), id)
 	if err != nil {
 		return fmt.Errorf("could not update item: %w", err)
 	}

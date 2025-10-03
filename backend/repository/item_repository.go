@@ -3,6 +3,7 @@ package repository
 
 import (
 	"database/sql"
+	"fmt"
 	"time"
 
 	"github.com/jennaborowy/fullstack-Go-Docker/models"
@@ -39,16 +40,54 @@ func (r *ItemRepository) GetAll() ([]models.Item, error) {
 }
 
 // DeleteItemByID deletes an item by ID
-func (r *ItemRepository) DeleteItemByID(id int) {
+func (r *ItemRepository) DeleteItemByID(id int) error {
+	res, err := r.db.Exec("DELETE FROM items WHERE id = ?", id)
+	if err != nil {
+		return fmt.Errorf("failed to delte item: %w", err)
+	}
 
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to check rows affected: %w", err)
+	}
+
+	if rows == 0 {
+		return fmt.Errorf("no item found with id %d", id)
+	}
+
+	return nil
 }
 
 // CreateItem creates a new item with title, date, and content
-func (r *ItemRepository) CreateItem(title string, date time.Time, content string) {
+func (r *ItemRepository) CreateItem(title string, date time.Time, content string) (int64, error) {
+	res, err := r.db.Exec("INSERT INTO items (title, date, content) VALUES (?, ?, ?)", title, date, content)
+	if err != nil {
+		return 0, fmt.Errorf("failed to create new item: %w", err)
+	}
 
+	id, err := res.LastInsertId()
+	if err != nil {
+		return 0, fmt.Errorf("could not obtain new id: %d", id)
+	}
+
+	return id, nil
 }
 
 // UpdateItem updates an item's title, date, and/or content
-func (r *ItemRepository) UpdateItem(title string, date time.Time, content string) {
+func (r *ItemRepository) UpdateItem(id int, title string, date time.Time, content string) error {
+	res, err := r.db.Exec("UPDATE items Set title = ?, date = ?, content = ? WHERE id = ?", title, date, content, id)
+	if err != nil {
+		return fmt.Errorf("could not update item: %w", err)
+	}
 
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("unable to check affected rows: %w", err)
+	}
+
+	if rows == 0 {
+		return fmt.Errorf("no item found with id %d", id)
+	}
+
+	return nil
 }

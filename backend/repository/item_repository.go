@@ -43,7 +43,7 @@ func (r *ItemRepository) GetAll() ([]models.Item, error) {
 func (r *ItemRepository) DeleteItemByID(id int) error {
 	res, err := r.db.Exec("DELETE FROM items WHERE id = ?", id)
 	if err != nil {
-		return fmt.Errorf("failed to delte item: %w", err)
+		return fmt.Errorf("failed to delete item: %w", err)
 	}
 
 	rows, err := res.RowsAffected()

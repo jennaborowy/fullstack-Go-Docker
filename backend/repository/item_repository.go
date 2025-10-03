@@ -39,6 +39,37 @@ func (r *ItemRepository) GetAll() ([]models.Item, error) {
 
 }
 
+// GetByID retrieves a single item by its ID
+func (r *ItemRepository) GetByID(id int) (*models.Item, error) {
+	row := r.db.QueryRow("SELECT id, title, date, content, list_id FROM items WHERE id = ?", id)
+
+	var item models.Item
+	err := row.Scan(&item.ID, &item.Title, &item.Date, &item.Content, &item.ListID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("item not found")
+		}
+		return nil, err
+	}
+
+	return &item, nil
+}
+
+// GetItemsByListID gets an item by the list it is in
+func (r *ItemRepository) GetByListID(listID int) (*models.Item, error) {
+	row := r.db.QueryRow("SELECT id, title, date, content, list_id FROM items WHERE list_id = ?", listID)
+	var item models.Item
+	err := row.Scan(&item.ID, &item.Title, &item.Date, &item.Content, &item.ListID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("item not found")
+		}
+		return nil, err
+	}
+
+	return &item, nil
+}
+
 // DeleteItemByID deletes an item by ID
 func (r *ItemRepository) DeleteItemByID(id int) error {
 	res, err := r.db.Exec("DELETE FROM items WHERE id = ?", id)

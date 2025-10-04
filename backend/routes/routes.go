@@ -5,12 +5,15 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/jennaborowy/fullstack-Go-Docker/handlers"
+	"github.com/jennaborowy/fullstack-Go-Docker/middleware"
 	"github.com/jennaborowy/fullstack-Go-Docker/repository"
 )
 
 func SetupRoutes(db *sql.DB) *gin.Engine {
 	// create a new gin engine
 	router := gin.Default()
+
+	router.Use(middleware.CORSMiddleware())
 
 	// create repositories and handlers
 	itemRepo := repository.NewItemRepository(db)

@@ -1,0 +1,24 @@
+# Node dependencies
+node_modules
+npm-debug.log
+yarn.lock
+pnpm-lock.yaml
+
+# Production build output (rebuilt inside container)
+build/
+dist/
+
+# Env files
+*.env
+config.env
+
+# Git
+.git
+.gitignore
+
+# Editor/OS clutter
+.vscode
+.idea
+*.swp
+.DS_Store
+Thumbs.db

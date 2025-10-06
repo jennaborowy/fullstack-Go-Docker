@@ -2,7 +2,6 @@
 package handlers
 
 import (
-	"log"
 	"net/http"
 	"strconv"
 
@@ -16,7 +15,7 @@ type ListHandler struct {
 }
 
 // NewListHandler creates and returns a new ListHandler
-func NewListHandler(repo *repository.ListRepository) *ListHandler {
+func NewListHandler(repo *repository.ListRepository, itemRepo *repository.ItemRepository) *ListHandler {
 	return &ListHandler{repo: repo}
 }
 
@@ -30,10 +29,9 @@ func (h *ListHandler) GetLists(c *gin.Context) {
 	c.JSON(http.StatusOK, lists)
 }
 
-// GetList returns a single list, optionally with its items
+// GetList returns a single list with items fetched
 func (h *ListHandler) GetList(c *gin.Context) {
 	idStr := c.Param("id")
-	log.Printf("Received id param: '%s'\n", idStr) // <-- add this
 
 	id, err := strconv.Atoi(idStr)
 

@@ -50,23 +50,6 @@ func (h *ItemHandler) GetItem(c *gin.Context) {
 	c.JSON(http.StatusOK, item)
 }
 
-// GetItemFromList attempts to get a single item by the list it is in
-// func (h *ItemHandler) GetItemFromList(c *gin.Context) {
-// 	listID, err := strconv.Atoi(c.Param("list_id"))
-// 	if err != nil {
-// 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid list_id"})
-// 		return
-// 	}
-
-// 	item, err := h.repo.GetByListID(listID)
-// 	if err != nil {
-// 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-// 		return
-// 	}
-
-// 	c.JSON(http.StatusOK, item)
-// }
-
 // DeleteItem attempts to delete an item by id and returns no content
 func (h *ItemHandler) DeleteItem(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))

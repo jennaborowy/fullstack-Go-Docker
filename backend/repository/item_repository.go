@@ -55,19 +55,24 @@ func (r *ItemRepository) GetByID(id int) (*models.Item, error) {
 	return &item, nil
 }
 
-// GetItemsByListID gets an item by the list it is in
-// func (r *ItemRepository) GetByListID(listID int) (*models.Item, error) {
-// 	row := r.db.QueryRow("SELECT id, title, date, content, list_id, created_at, updated_at FROM items WHERE list_id = ?", listID)
-// 	var item models.Item
-// 	err := row.Scan(&item.ID, &item.Title, &item.Date, &item.Content, &item.ListID, &item.CreatedAt, &item.UpdatedAt)
+// // GetItemsByListID gets all items in a list by the listID it is in.
+// func (r *ItemRepository) GetByListID(listID int) (*[]models.Item, error) {
+// 	rows, err := r.db.Query("SELECT id, title, item_date, content, list_id, created_at, updated_at FROM items WHERE list_id = $1", listID)
 // 	if err != nil {
-// 		if err == sql.ErrNoRows {
-// 			return nil, fmt.Errorf("item not found")
-// 		}
 // 		return nil, err
 // 	}
+// 	defer rows.Close()
 
-// 	return &item, nil
+// 	var items []models.Item
+// 	for rows.Next() {
+// 		var item models.Item
+// 		// scans the row into the current item, matching the fields
+// 		if err := rows.Scan(&item.ID, &item.Title, &item.Date, &item.Content, &item.ListID, &item.CreatedAt, &item.UpdatedAt); err != nil {
+// 			return nil, err
+// 		}
+// 		items = append(items, item)
+// 	}
+// 	return &items, nil
 // }
 
 // DeleteItemByID deletes an item by ID

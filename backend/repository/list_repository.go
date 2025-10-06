@@ -60,6 +60,8 @@ func (r *ListRepository) GetList(id int) (*models.List, error) {
 		list.Items = append(list.Items, item)
 	}
 
+	// could instead change this to do a left join for a single query, rather than two
+
 	return list, nil
 }
 

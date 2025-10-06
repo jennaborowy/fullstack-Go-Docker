@@ -15,7 +15,7 @@ type ListHandler struct {
 }
 
 // NewListHandler creates and returns a new ListHandler
-func NewListHandler(repo *repository.ListRepository, itemRepo *repository.ItemRepository) *ListHandler {
+func NewListHandler(repo *repository.ListRepository) *ListHandler {
 	return &ListHandler{repo: repo}
 }
 

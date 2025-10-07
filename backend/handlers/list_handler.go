@@ -11,7 +11,7 @@ import (
 
 // ListHandler is used to process requests related to lists
 type ListHandler struct {
-	repo *repository.ListRepository
+	repo repository.ListRepositoryInterface
 }
 
 // NewListHandler creates and returns a new ListHandler

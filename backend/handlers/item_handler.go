@@ -15,7 +15,7 @@ import (
 
 // ItemHandler is used to process requests related to items
 type ItemHandler struct {
-	repo *repository.ItemRepository
+	repo repository.ItemRepositoryInterface
 }
 
 // NewItemHandler creates a new ItemHandler

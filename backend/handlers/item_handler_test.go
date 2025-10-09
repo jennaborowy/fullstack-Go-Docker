@@ -13,6 +13,7 @@ import (
 	"github.com/jennaborowy/fullstack-Go-Docker/handlers"
 	"github.com/jennaborowy/fullstack-Go-Docker/mocks"
 	"github.com/jennaborowy/fullstack-Go-Docker/models"
+	"github.com/jennaborowy/fullstack-Go-Docker/repository"
 	"go.uber.org/mock/gomock"
 )
 
@@ -27,6 +28,93 @@ var (
 
 	validList = models.NewList("test list", multipleItems)
 )
+
+func TestGetItem(t *testing.T) {
+	tests := []struct {
+		name           string
+		setupMock      func(*mocks.MockItemRepositoryInterface)
+		requestedID    string
+		expectedStatus int
+		checkResponse  func(t *testing.T, w *httptest.ResponseRecorder)
+	}{
+		{
+			name: "successful get",
+			setupMock: func(m *mocks.MockItemRepositoryInterface) {
+				m.EXPECT().
+					GetByID(1).
+					Return(validItem, nil).
+					Times(1)
+			},
+			requestedID:    "1",
+			expectedStatus: http.StatusOK,
+			checkResponse: func(t *testing.T, w *httptest.ResponseRecorder) {
+				var response models.Item
+				err := json.Unmarshal(w.Body.Bytes(), &response)
+				if err != nil {
+					t.Fatalf("failed to unmarshal response: %v", err)
+				}
+
+				if response.Title != validItem.Title {
+					t.Errorf("expected title '%s', got '%s'", validItem.Title, response.Title)
+				}
+			},
+		},
+		{
+			name: "item does not exist",
+			setupMock: func(m *mocks.MockItemRepositoryInterface) {
+				m.EXPECT().
+					GetByID(5).
+					Return(nil, repository.ErrNotFound).
+					Times(1)
+			},
+			requestedID:    "5",
+			expectedStatus: http.StatusNotFound,
+			checkResponse:  nil,
+		},
+		{
+			name:           "invalid id format",
+			setupMock:      func(m *mocks.MockItemRepositoryInterface) {},
+			requestedID:    "invalid",
+			expectedStatus: http.StatusBadRequest,
+			checkResponse:  nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gin.SetMode(gin.TestMode)
+
+			ctrl := gomock.NewController(t)
+
+			repo := mocks.NewMockItemRepositoryInterface(ctrl)
+			handler := handlers.NewItemHandler(repo)
+
+			tt.setupMock(repo)
+
+			w := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(w)
+
+			c.Params = gin.Params{
+				{Key: "id", Value: tt.requestedID},
+			}
+
+			c.Request = httptest.NewRequest(http.MethodGet, "/items/"+tt.requestedID, nil)
+
+			handler.GetItem(c)
+
+			if w.Code != tt.expectedStatus {
+				t.Errorf("expected status %d, got %d. Response: %s",
+					tt.expectedStatus, w.Code, w.Body.String())
+			}
+
+			if tt.checkResponse != nil {
+				tt.checkResponse(t, w)
+			}
+		},
+		)
+	}
+
+}
 
 func TestGetItems(t *testing.T) {
 	tests := []struct {
@@ -115,6 +203,10 @@ func TestGetItems(t *testing.T) {
 				t.Errorf("expected status %d, got %d. Response: %s",
 					tt.expectedStatus, w.Code, w.Body.String())
 			}
+
+			if tt.checkResponse != nil {
+				tt.checkResponse(t, w)
+			}
 		})
 	}
 
@@ -200,5 +292,22 @@ func TestCreateItem(t *testing.T) {
 					tt.expectedStatus, w.Code, w.Body.String())
 			}
 		})
+	}
+}
+
+func TestDeleteItem(t *testing.T) {
+	tests := []struct {
+		name           string
+		setupMock      func(m *mocks.MockItemRepositoryInterface)
+		id             int
+		expectedStatus int
+		checkResponse  func(*testing.T, *httptest.ResponseRecorder)
+	} {
+		{
+			name: "successful delete"
+		},
+		{
+			name: "item not found"
+		},
 	}
 }

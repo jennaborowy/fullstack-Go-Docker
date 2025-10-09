@@ -4,6 +4,8 @@ package handlers
 // Note: should probably update to do more of the JSON binding
 
 import (
+	"errors"
+	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -19,7 +21,7 @@ type ItemHandler struct {
 }
 
 // NewItemHandler creates a new ItemHandler
-func NewItemHandler(repo *repository.ItemRepository) *ItemHandler {
+func NewItemHandler(repo repository.ItemRepositoryInterface) *ItemHandler {
 	return &ItemHandler{repo: repo}
 }
 
@@ -43,6 +45,11 @@ func (h *ItemHandler) GetItem(c *gin.Context) {
 
 	item, err := h.repo.GetByID(id)
 	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "item not found"})
+			return
+		}
+
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -63,7 +70,7 @@ func (h *ItemHandler) DeleteItem(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.Status(http.StatusNoContent)
+	c.JSON(http.StatusNoContent, nil)
 }
 
 // CreateItem attempts to create a new item and returns its ID
@@ -76,12 +83,16 @@ func (h *ItemHandler) CreateItem(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&input); err != nil {
+		log.Printf("Bind error: %v", err) // Add this
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
+	log.Printf("Received item: %+v", input)
+
 	itemDate, err := time.Parse("2006-01-02", input.ItemDate)
 	if err != nil {
+		log.Printf("Bind error: %v", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid date format"})
 		return
 	}

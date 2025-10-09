@@ -299,15 +299,60 @@ func TestDeleteItem(t *testing.T) {
 	tests := []struct {
 		name           string
 		setupMock      func(m *mocks.MockItemRepositoryInterface)
-		id             int
+		id             string
 		expectedStatus int
-		checkResponse  func(*testing.T, *httptest.ResponseRecorder)
-	} {
+	}{
 		{
-			name: "successful delete"
+			name: "successful delete (item exits)",
+			setupMock: func(m *mocks.MockItemRepositoryInterface) {
+				m.EXPECT().
+					DeleteItemByID(1).
+					Return(nil).
+					Times(1)
+			},
+			id:             "1",
+			expectedStatus: http.StatusNoContent,
 		},
 		{
-			name: "item not found"
+			name: "repository error",
+			setupMock: func(m *mocks.MockItemRepositoryInterface) {
+				m.EXPECT().
+					DeleteItemByID(20).
+					Return(errors.New("database error")).
+					Times(1)
+			},
+			id:             "20",
+			expectedStatus: http.StatusInternalServerError,
 		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gin.SetMode(gin.TestMode)
+
+			ctrl := gomock.NewController(t)
+
+			repo := mocks.NewMockItemRepositoryInterface(ctrl)
+			handler := handlers.NewItemHandler(repo)
+
+			tt.setupMock(repo)
+
+			w := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(w)
+
+			c.Params = gin.Params{
+				{Key: "id", Value: tt.id},
+			}
+
+			http.NewRequest("DELETE", "/items/"+tt.id, nil)
+
+			handler.DeleteItem(c)
+
+			if w.Code != tt.expectedStatus {
+				t.Errorf("expected status %d, got %d. Response: %s",
+					tt.expectedStatus, w.Code, w.Body.String())
+			}
+
+		})
 	}
 }

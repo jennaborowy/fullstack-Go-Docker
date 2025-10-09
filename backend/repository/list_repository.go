@@ -9,6 +9,14 @@ import (
 	"github.com/jennaborowy/fullstack-Go-Docker/models"
 )
 
+type ListRepositoryInterface interface {
+	CreateList(title string) (*models.List, error)
+	GetList(id int) (*models.List, error)
+	GetAllLists() ([]models.List, error)
+	UpdateTitle(id int, title string) (*models.List, error)
+	DeleteList(id int) error
+}
+
 // ListRepository handles CRUD operations for lists of items
 type ListRepository struct {
 	db *sql.DB

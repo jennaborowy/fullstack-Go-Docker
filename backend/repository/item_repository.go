@@ -3,11 +3,22 @@ package repository
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/jennaborowy/fullstack-Go-Docker/models"
 )
+
+var ErrNotFound = errors.New("item not found")
+
+type ItemRepositoryInterface interface {
+	GetAll() ([]models.Item, error)
+	GetByID(id int) (*models.Item, error)
+	DeleteItemByID(id int) error
+	CreateItem(title string, date time.Time, content string, listID int) (*models.Item, error)
+	UpdateItem(id int, title string, date time.Time, content string) error
+}
 
 // ItemRepository handles CRUD operations for items
 type ItemRepository struct {
@@ -47,7 +58,7 @@ func (r *ItemRepository) GetByID(id int) (*models.Item, error) {
 	err := row.Scan(&item.ID, &item.Title, &item.Date, &item.Content, &item.ListID, &item.CreatedAt, &item.UpdatedAt)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return nil, fmt.Errorf("item not found")
+			return nil, ErrNotFound
 		}
 		return nil, err
 	}

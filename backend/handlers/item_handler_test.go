@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jennaborowy/fullstack-Go-Docker/handlers"
@@ -15,207 +16,109 @@ import (
 	"go.uber.org/mock/gomock"
 )
 
-// var (
-// 	item1 = &models.Item{
-// 		ID:        1,
-// 		Title:     "test",
-// 		Date:      time.Date(2025, 10, 8, 0, 0, 0, 0, time.Local),
-// 		Content:   "hello this is a test description",
-// 		ListID:    1,
-// 		CreatedAt: time.Now(),
-// 		UpdatedAt: time.Now(),
-// 	}
-// )
+var (
+	validItem = models.NewItem("Item 1", time.Date(2025, 10, 7, 0, 0, 0, 0, time.UTC), "test description uno", 1)
 
-// var (
-//     validItem = &models.Item{
-//         ID:     "item-1",
-//         Title:   "Test Item 1",
-// 		Date:
-// 		Content:
-//         ListID: "list-123",
-// 		CreatedAt:
-// 		UpdatedAt:
-//     }
+	multipleItems = []models.Item{
+		*models.NewItem("Item 2", time.Date(2025, 10, 8, 0, 0, 0, 0, time.UTC), "test description dos", 1),
+		*models.NewItem("Item 3", time.Date(2025, 10, 10, 0, 0, 0, 0, time.UTC), "third test description", 1),
+		*models.NewItem("Item 4", time.Date(2025, 10, 12, 0, 0, 0, 0, time.UTC), "fourth test description", 1),
+	}
 
-//     validList = &models.List{
-//         ID:   "list-456",
-//         Name: "Test List",
-// 		Date:
-//     }
+	validList = models.NewList("test list", multipleItems)
+)
 
-//     multipleItems = []*models.Item{
-//         {ID: "1", Title: "Item 1", Date: , ListID: "list-456", CreatedAt:, UpdatedAt: },
-//         {ID: "2", Title: "Item 2", Date: , ListID: "list-456", CreatedAt: , UpdatedAt: },
-//         {ID: "3", Title: "Item 3", ListID: "list-456"},
-//     }
-// )
+func TestGetItems(t *testing.T) {
+	tests := []struct {
+		name           string
+		setupMock      func(*mocks.MockItemRepositoryInterface)
+		expectedStatus int
+		checkResponse  func(*testing.T, *httptest.ResponseRecorder)
+	}{
+		{
+			name: "successfully fetch all items",
+			setupMock: func(m *mocks.MockItemRepositoryInterface) {
+				m.EXPECT().
+					GetAll().
+					Return(multipleItems, nil).
+					Times(1)
+			},
+			expectedStatus: http.StatusOK,
+			checkResponse: func(t *testing.T, w *httptest.ResponseRecorder) {
+				var response []models.Item
+				err := json.Unmarshal(w.Body.Bytes(), &response)
+				if err != nil {
+					t.Fatalf("failed to unmarshal response: %v", err)
+				}
 
-// func TestGetItems(t *testing.T) {
-// 	ctrl := gomock.NewController(t)
+				if len(response) != 3 {
+					t.Errorf("expected 3 items, got %d", len(response))
+				}
 
-// 	mock := mocks.NewMockItemRepositoryInterface(ctrl)
+				if response[0].Title != "Item 1" {
+					t.Errorf("expected first item title 'Item 1', got '%s'", response[0].Title)
+				}
+			},
+		},
+		{
+			name: "repository error",
+			setupMock: func(m *mocks.MockItemRepositoryInterface) {
+				m.EXPECT().
+					GetAll().
+					Return(nil, errors.New("database error")).
+					Times(1)
+			},
+			expectedStatus: http.StatusInternalServerError,
+			checkResponse:  nil,
+		},
+		{
+			name: "empty items list",
+			setupMock: func(m *mocks.MockItemRepositoryInterface) {
+				m.EXPECT().
+					GetAll().
+					Return([]models.Item{}, nil).
+					Times(1)
+			},
+			expectedStatus: http.StatusOK,
+			checkResponse: func(t *testing.T, w *httptest.ResponseRecorder) {
+				var response []models.Item
+				json.Unmarshal(w.Body.Bytes(), &response)
 
-// 	// params in Return should match the return signature of method being mocked
+				if len(response) != 0 {
+					t.Errorf("expected 0 items, got %d", len(response))
+				}
+			},
+		},
+	}
 
-// 	mock.EXPECT().
-// 		GetAll().
-// 		Return(nil)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gin.SetMode(gin.TestMode)
 
-// 	handler := handlers.NewItemHandler(mock)
+			// Fresh controller per iteration
+			ctrl := gomock.NewController(t)
 
-// }
+			repo := mocks.NewMockItemRepositoryInterface(ctrl)
+			handler := handlers.NewItemHandler(repo)
 
-// func TestCreateItem(t *testing.T) {
-// 	ctrl := gomock.NewController(t)
+			// Setup mock expectations
+			tt.setupMock(repo)
 
-// 	repo := mocks.NewMockItemRepositoryInterface(ctrl)
-// 	handler := handlers.NewItemHandler(repo)
+			w := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(w)
 
-// 	t.Run("successful creation", func(t *testing.T) {
-// 		gin.SetMode(gin.TestMode)
+			c.Request = httptest.NewRequest(http.MethodGet, "/items", nil)
 
-// 		testTime := time.Date(2025, 10, 8, 12, 0, 0, 0, time.UTC)
+			handler.GetItems(c)
 
-// 		date := time.Date(2025, 10, 8, 0, 0, 0, 0, time.UTC)
+			if w.Code != tt.expectedStatus {
+				t.Errorf("expected status %d, got %d. Response: %s",
+					tt.expectedStatus, w.Code, w.Body.String())
+			}
+		})
+	}
 
-// 		requestBody := map[string]interface{}{
-// 			"title":     "test",
-// 			"content":   "hello this is a test description",
-// 			"item_date": "2025-10-08", // Send as string in YYYY-MM-DD format
-// 			"list_id":   1,
-// 		}
-
-// 		expectedItem := &models.Item{
-// 			ID:        1,
-// 			Title:     "test",
-// 			Content:   "hello this is a test description",
-// 			Date:      date,
-// 			ListID:    1,
-// 			CreatedAt: testTime, // Use fixed time
-// 			UpdatedAt: testTime, // Use fixed time
-// 		}
-
-// 		repo.EXPECT().
-// 			CreateItem("test", date, "hello this is a test description", 1).
-// 			Return(expectedItem, nil).
-// 			Times(1)
-
-// 		// if not using gin, use this to call handler.CreateItem(w, req)
-// 		// body, _ := json.Marshal(item)
-// 		// req := httptest.NewRequest(http.MethodPost, "/items", bytes.NewBuffer(body))
-// 		// w := httptest.NewRecorder()
-
-// 		// create context with request header
-// 		w := httptest.NewRecorder()
-// 		c, _ := gin.CreateTestContext(w)
-
-// 		// prepare request body
-// 		body, _ := json.Marshal(requestBody)
-// 		c.Request = httptest.NewRequest(http.MethodPost, "/items", bytes.NewBuffer(body))
-// 		c.Request.Header.Set("Content-Type", "application/json")
-
-// 		// call handler
-// 		handler.CreateItem(c)
-
-// 		// assert response
-// 		if w.Code != http.StatusCreated {
-// 			t.Errorf("expected status %d, got %d. Response: %s", http.StatusCreated, w.Code, w.Body.String())
-// 		}
-
-// 		var response models.Item
-// 		json.Unmarshal(w.Body.Bytes(), &response)
-
-// 		if response.Title != "test" {
-// 			t.Errorf("expected title 'test', got '%s'", response.Title)
-// 		}
-// 		if response.ListID != 1 {
-// 			t.Errorf("expected list_id 1, got %d", response.ListID)
-// 		}
-// 	})
-
-// 	t.Run("repository error", func(t *testing.T) {
-// 		gin.SetMode(gin.TestMode)
-
-// 		requestBody := map[string]interface{}{
-// 			"title":     "test",
-// 			"content":   "hello this is a test description",
-// 			"item_date": "2025-10-08",
-// 			"list_id":   1,
-// 		}
-
-// 		repo.EXPECT().
-// 			CreateItem("test", gomock.Any(), "hello this is a test description", 1).
-// 			Return(nil, errors.New("database connection failed")).
-// 			Times(1)
-
-// 		w := httptest.NewRecorder()
-// 		c, _ := gin.CreateTestContext(w)
-
-// 		body, _ := json.Marshal(requestBody)
-// 		c.Request = httptest.NewRequest(http.MethodPost, "/items", bytes.NewBuffer(body))
-// 		c.Request.Header.Set("Content-Type", "applications/json")
-
-// 		handler.CreateItem(c)
-
-// 		if w.Code != http.StatusInternalServerError {
-// 			t.Errorf("expected status %d, got %d", http.StatusInternalServerError, w.Code)
-// 		}
-
-// 	})
-
-// 	t.Run("invalid date format", func(t *testing.T) {
-// 		gin.SetMode(gin.TestMode)
-
-// 		// intentionally wrong date format
-// 		requestBody := map[string]interface{}{
-// 			"title":     "test",
-// 			"content":   "hello this is a test description",
-// 			"item_date": "2025-10-08T00:00:00Z",
-// 			"list_id":   1,
-// 		}
-
-// 		// No repo mock needed - binding/parsing fails first
-// 		// repo.EXPECT() is NOT called
-
-// 		w := httptest.NewRecorder()
-// 		c, _ := gin.CreateTestContext(w)
-
-// 		body, _ := json.Marshal(requestBody)
-// 		c.Request = httptest.NewRequest(http.MethodPost, "/items", bytes.NewBuffer(body))
-// 		c.Request.Header.Set("Content-Type", "application/json")
-
-// 		handler.CreateItem(c)
-
-// 		if w.Code != http.StatusBadRequest {
-// 			t.Errorf("expected status %d, got %d", http.StatusBadRequest, w.Code)
-// 		}
-// 	})
-
-// 	t.Run("missing required fields", func(t *testing.T) {
-// 		gin.SetMode(gin.TestMode)
-
-// 		// Missing title - should return 400
-// 		requestBody := map[string]interface{}{
-// 			"content":   "hello this is a test description",
-// 			"item_date": "2025-10-08",
-// 			"list_id":   1,
-// 		}
-
-// 		w := httptest.NewRecorder()
-// 		c, _ := gin.CreateTestContext(w)
-
-// 		body, _ := json.Marshal(requestBody)
-// 		c.Request = httptest.NewRequest(http.MethodPost, "/items", bytes.NewBuffer(body))
-// 		c.Request.Header.Set("Content-Type", "application/json")
-
-// 		handler.CreateItem(c)
-
-// 		if w.Code != http.StatusBadRequest {
-// 			t.Errorf("expected status %d, got %d", http.StatusBadRequest, w.Code)
-// 		}
-// 	})
-// }
+}
 
 func TestCreateItem(t *testing.T) {
 	tests := []struct {

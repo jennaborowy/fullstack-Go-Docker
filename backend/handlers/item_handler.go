@@ -108,37 +108,55 @@ func (h *ItemHandler) CreateItem(c *gin.Context) {
 
 // UpdateItem attempts to edit an item's information and returns the updated item
 func (h *ItemHandler) UpdateItem(c *gin.Context) {
-	title := c.Param("title")
-	content := c.Param("content")
-	dateStr := c.Param("date")
 	idStr := c.Param("id")
-
-	date, err := time.Parse("2006-01-02", dateStr)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid date format"})
-		return
-	}
-
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
 		return
 	}
 
+	var req struct {
+		Title    string `json:"title"`
+		Content  string `json:"content"`
+		ItemDate string `json:"item_date"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		return
+	}
+
+	date, err := time.Parse("2006-01-02", req.ItemDate)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid date format"})
+		return
+	}
+
 	// fetch item to get listID
 	existingItem, err := h.repo.GetByID(id)
 	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "item not found"})
+			return
+		}
+
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	err = h.repo.UpdateItem(id, title, date, content)
+	err = h.repo.UpdateItem(id, req.Title, date, req.Content)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+
+		if errors.Is(err, repository.ErrNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "item not found"})
+			return
+		}
+
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	updatedItem := models.NewItem(title, date, content, existingItem.ListID)
+	updatedItem := models.NewItem(req.Title, date, req.Content, existingItem.ListID)
 
 	c.JSON(http.StatusOK, updatedItem)
 

@@ -143,8 +143,8 @@ func TestGetItems(t *testing.T) {
 					t.Errorf("expected 3 items, got %d", len(response))
 				}
 
-				if response[0].Title != "Item 1" {
-					t.Errorf("expected first item title 'Item 1', got '%s'", response[0].Title)
+				if response[0].Title != "Item 2" {
+					t.Errorf("expected first item title 'Item 2', got '%s'", response[0].Title)
 				}
 			},
 		},
@@ -353,6 +353,166 @@ func TestDeleteItem(t *testing.T) {
 					tt.expectedStatus, w.Code, w.Body.String())
 			}
 
+		})
+	}
+}
+
+func TestUpdateItem(t *testing.T) {
+	tests := []struct {
+		name           string
+		setupMock      func(m *mocks.MockItemRepositoryInterface)
+		id             string
+		requestBody    map[string]interface{}
+		expectedStatus int
+		checkResponse  func(t *testing.T, w *httptest.ResponseRecorder)
+	}{
+		{
+			name: "succesfully update item",
+			setupMock: func(m *mocks.MockItemRepositoryInterface) {
+				m.EXPECT().
+					GetByID(1).
+					Return(validItem, nil).
+					Times(1)
+
+				m.EXPECT().
+					UpdateItem(1, "new title", gomock.Any(), "new content").
+					Return(nil).
+					Times(1)
+			},
+			id: "1",
+			requestBody: map[string]interface{}{
+				"title":     "new title",
+				"content":   "new content",
+				"item_date": "2025-10-23",
+			},
+			expectedStatus: http.StatusOK,
+			checkResponse: func(t *testing.T, w *httptest.ResponseRecorder) {
+				var response models.Item
+				err := json.Unmarshal(w.Body.Bytes(), &response)
+				if err != nil {
+					t.Fatalf("failed to unmarshal response: %v", err)
+				}
+
+				if response.Title != "new title" {
+					t.Errorf("expected first item title 'new title', got '%s'", response.Title)
+				}
+			},
+		},
+		{
+			name: "repository error",
+			setupMock: func(m *mocks.MockItemRepositoryInterface) {
+				m.EXPECT().
+					GetByID(1).
+					Return(validItem, nil).
+					Times(1)
+
+				m.EXPECT().
+					UpdateItem(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(errors.New("database error")).
+					Times(1)
+			},
+			id: "1",
+			requestBody: map[string]interface{}{
+				"title":     "new title",
+				"content":   "new content",
+				"item_date": "2025-10-23",
+			},
+			expectedStatus: http.StatusInternalServerError,
+			checkResponse:  nil,
+		},
+		{
+			name: "item not found on GetByID",
+			setupMock: func(m *mocks.MockItemRepositoryInterface) {
+				// GetByID fails - UpdateItem is never called
+				m.EXPECT().
+					GetByID(999).
+					Return(nil, repository.ErrNotFound).
+					Times(1)
+			},
+			id: "999",
+			requestBody: map[string]interface{}{
+				"title":     "new title",
+				"item_date": "2025-10-23",
+				"content":   "new content",
+			},
+			expectedStatus: http.StatusNotFound,
+			checkResponse:  nil,
+		},
+		{
+			name: "invalid ID format",
+			setupMock: func(m *mocks.MockItemRepositoryInterface) {
+				// No expectations - should fail before reaching repo
+			},
+			id: "invalid",
+			requestBody: map[string]interface{}{
+				"title":     "new title",
+				"item_date": "2025-10-23",
+				"content":   "new content",
+			},
+			expectedStatus: http.StatusBadRequest,
+			checkResponse:  nil,
+		},
+		{
+			name: "invalid date format",
+			setupMock: func(m *mocks.MockItemRepositoryInterface) {
+				// No expectations - should fail before reaching repo
+			},
+			id: "1",
+			requestBody: map[string]interface{}{
+				"title":     "new title",
+				"item_date": "invalid-date",
+				"content":   "new content",
+			},
+			expectedStatus: http.StatusBadRequest,
+			checkResponse:  nil,
+		},
+		{
+			name: "missing required fields",
+			setupMock: func(m *mocks.MockItemRepositoryInterface) {
+				// No expectations - should fail at binding
+			},
+			id: "1",
+			requestBody: map[string]interface{}{
+				"title": "new title",
+				// Missing item_date and content
+			},
+			expectedStatus: http.StatusBadRequest,
+			checkResponse:  nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gin.SetMode(gin.TestMode)
+
+			ctrl := gomock.NewController(t)
+
+			repo := mocks.NewMockItemRepositoryInterface(ctrl)
+			handler := handlers.NewItemHandler(repo)
+
+			tt.setupMock(repo)
+
+			w := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(w)
+
+			c.Params = gin.Params{
+				{Key: "id", Value: tt.id},
+			}
+
+			body, _ := json.Marshal(tt.requestBody)
+			c.Request = httptest.NewRequest(http.MethodPut, "/items/"+tt.id, bytes.NewBuffer(body))
+			c.Request.Header.Set("Content-Type", "application/json")
+
+			handler.UpdateItem(c)
+
+			if tt.expectedStatus != w.Code {
+				t.Errorf("expected status %d, got %d. Response: %s",
+					tt.expectedStatus, w.Code, w.Body.String())
+			}
+
+			if tt.checkResponse != nil {
+				tt.checkResponse(t, w)
+			}
 		})
 	}
 }

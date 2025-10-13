@@ -1,6 +1,7 @@
 package handlers_test
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -236,6 +237,129 @@ func TestGetLists(t *testing.T) {
 				tt.checkResponse(t, w)
 			}
 
+		})
+	}
+}
+
+func TestCreateList(t *testing.T) {
+	tests := []struct {
+		name           string
+		setupMock      func(m *mocks.MockListRepositoryInterface)
+		requestBody    map[string]interface{}
+		expectedStatus int
+		checkResponse  func(t *testing.T, w *httptest.ResponseRecorder)
+	}{
+		{
+			name: "successfully create list",
+			setupMock: func(m *mocks.MockListRepositoryInterface) {
+				m.EXPECT().
+					CreateList(gomock.Any()).
+					DoAndReturn(func(title string) (*models.List, error) {
+						return &models.List{
+							ID:    1,
+							Title: "My New List",
+							Items: []models.Item{},
+						}, nil
+					}).
+					Times(1)
+			},
+			requestBody: map[string]interface{}{
+				"title": "My New List",
+			},
+			expectedStatus: http.StatusCreated,
+			checkResponse: func(t *testing.T, w *httptest.ResponseRecorder) {
+				var response models.List
+				err := json.Unmarshal(w.Body.Bytes(), &response)
+				if err != nil {
+					t.Fatalf("failed to unmarshal response: %v", err)
+				}
+				if response.Title != "My New List" {
+					t.Errorf("expected title 'My New List', got '%s'", response.Title)
+				}
+				if response.ID == 0 {
+					t.Error("expected ID to be set")
+				}
+			},
+		},
+		{
+			name: "repository error",
+			setupMock: func(m *mocks.MockListRepositoryInterface) {
+				m.EXPECT().
+					CreateList(gomock.Any()).
+					Return(nil, errors.New("database error")).
+					Times(1)
+			},
+			requestBody: map[string]interface{}{
+				"title": "My New List",
+			},
+			expectedStatus: http.StatusInternalServerError,
+			checkResponse:  nil,
+		},
+		{
+			name: "empty title",
+			setupMock: func(m *mocks.MockListRepositoryInterface) {
+				m.EXPECT().
+					CreateList(gomock.Any()).
+					DoAndReturn(func(title string) (*models.List, error) {
+						return &models.List{
+							ID:    1,
+							Title: "",
+							Items: []models.Item{},
+						}, nil
+					}).
+					Times(1)
+			},
+			requestBody: map[string]interface{}{
+				"title": "",
+			},
+			expectedStatus: http.StatusCreated,
+			checkResponse:  nil,
+		},
+		{
+			name:           "invalid JSON",
+			setupMock:      func(m *mocks.MockListRepositoryInterface) {},
+			requestBody:    nil, // Will send malformed JSON
+			expectedStatus: http.StatusBadRequest,
+			checkResponse:  nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gin.SetMode(gin.TestMode)
+
+			ctrl := gomock.NewController(t)
+
+			repo := mocks.NewMockListRepositoryInterface(ctrl)
+			handler := handlers.NewListHandler(repo)
+
+			tt.setupMock(repo)
+
+			w := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(w)
+
+			var body []byte
+			var err error
+			if tt.requestBody != nil {
+				body, err = json.Marshal(tt.requestBody)
+				if err != nil {
+					t.Fatalf("failed to marshal request: %v", err)
+				}
+			} else {
+				body = []byte("{invalid json}")
+			}
+
+			c.Request = httptest.NewRequest(http.MethodPost, "/lists", bytes.NewBuffer(body))
+			c.Request.Header.Set("Content-Type", "application/json")
+
+			handler.CreateList(c)
+
+			if tt.expectedStatus != w.Code {
+				t.Errorf("expected status %d, got %d. Response: %s",
+					tt.expectedStatus, w.Code, w.Body.String())
+			}
+			if tt.checkResponse != nil {
+				tt.checkResponse(t, w)
+			}
 		})
 	}
 }

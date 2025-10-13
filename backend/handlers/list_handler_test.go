@@ -480,3 +480,81 @@ func TestUpdateList(t *testing.T) {
 		})
 	}
 }
+
+func TestDeleteList(t *testing.T) {
+	tests := []struct {
+		name           string
+		setupMock      func(m *mocks.MockListRepositoryInterface)
+		id             string
+		expectedStatus int
+	}{
+		{
+			name: "successfully delete list",
+			setupMock: func(m *mocks.MockListRepositoryInterface) {
+				m.EXPECT().
+					DeleteList(1).
+					Return(nil).
+					Times(1)
+			},
+			id:             "1",
+			expectedStatus: http.StatusNoContent,
+		},
+		// {
+		//     name: "list not found",
+		//     setupMock: func(m *mocks.MockListRepositoryInterface) {
+		//         m.EXPECT().
+		//             DeleteList(999).
+		//             Return(repository.ErrNotFound).
+		//             Times(1)
+		//     },
+		//     id:             "999",
+		//     expectedStatus: http.StatusNotFound,
+		//     checkResponse:  nil,
+		// },
+		{
+			name: "repository error",
+			setupMock: func(m *mocks.MockListRepositoryInterface) {
+				m.EXPECT().
+					DeleteList(1).
+					Return(errors.New("database error")).
+					Times(1)
+			},
+			id:             "1",
+			expectedStatus: http.StatusInternalServerError,
+		},
+		{
+			name:           "invalid ID format",
+			setupMock:      func(m *mocks.MockListRepositoryInterface) {},
+			id:             "invalid",
+			expectedStatus: http.StatusBadRequest,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gin.SetMode(gin.TestMode)
+
+			ctrl := gomock.NewController(t)
+
+			repo := mocks.NewMockListRepositoryInterface(ctrl)
+			handler := handlers.NewListHandler(repo)
+
+			tt.setupMock(repo)
+
+			w := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(w)
+
+			c.Params = gin.Params{
+				{Key: "id", Value: tt.id},
+			}
+
+			c.Request = httptest.NewRequest(http.MethodDelete, "/lists/"+tt.id, nil)
+
+			handler.DeleteList(c)
+
+			if tt.expectedStatus != w.Code {
+				t.Errorf("expected status %d, got %d. Response: %s",
+					tt.expectedStatus, w.Code, w.Body.String())
+			}
+		})
+	}
+}

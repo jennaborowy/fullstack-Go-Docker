@@ -363,3 +363,120 @@ func TestCreateList(t *testing.T) {
 		})
 	}
 }
+
+func TestUpdateList(t *testing.T) {
+	tests := []struct {
+		name           string
+		setupMock      func(m *mocks.MockListRepositoryInterface)
+		id             string
+		requestBody    map[string]interface{}
+		expectedStatus int
+		checkResponse  func(t *testing.T, w *httptest.ResponseRecorder)
+	}{
+		{
+			name: "successfully update list",
+			setupMock: func(m *mocks.MockListRepositoryInterface) {
+				m.EXPECT().
+					UpdateTitle(1, "Updated Title").
+					Return(&models.List{
+						ID:    1,
+						Title: "Updated Title",
+						Items: []models.Item{},
+					}, nil).
+					Times(1)
+			},
+			id: "1",
+			requestBody: map[string]interface{}{
+				"title": "Updated Title",
+			},
+			expectedStatus: http.StatusOK,
+			checkResponse: func(t *testing.T, w *httptest.ResponseRecorder) {
+				var response models.List
+				err := json.Unmarshal(w.Body.Bytes(), &response)
+				if err != nil {
+					t.Fatalf("failed to unmarshal response: %v", err)
+				}
+				if response.Title != "Updated Title" {
+					t.Errorf("expected title 'Updated Title', got '%s'", response.Title)
+				}
+			},
+		},
+		{
+			name: "repository error on UpdateList",
+			setupMock: func(m *mocks.MockListRepositoryInterface) {
+				m.EXPECT().
+					UpdateTitle(1, "Updated Title").
+					Return(nil, errors.New("database error")).
+					Times(1)
+			},
+			id: "1",
+			requestBody: map[string]interface{}{
+				"title": "Updated Title",
+			},
+			expectedStatus: http.StatusInternalServerError,
+			checkResponse:  nil,
+		},
+		{
+			name:      "invalid ID format",
+			setupMock: func(m *mocks.MockListRepositoryInterface) {},
+			id:        "invalid",
+			requestBody: map[string]interface{}{
+				"title": "Updated Title",
+			},
+			expectedStatus: http.StatusBadRequest,
+			checkResponse:  nil,
+		},
+		{
+			name: "empty title",
+			setupMock: func(m *mocks.MockListRepositoryInterface) {
+				m.EXPECT().
+					UpdateTitle(1, "").
+					Return(&models.List{
+						ID:    1,
+						Title: "",
+						Items: []models.Item{},
+					}, nil).
+					Times(1)
+			},
+			id: "1",
+			requestBody: map[string]interface{}{
+				"title": "",
+			},
+			expectedStatus: http.StatusOK,
+			checkResponse:  nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gin.SetMode(gin.TestMode)
+
+			ctrl := gomock.NewController(t)
+
+			repo := mocks.NewMockListRepositoryInterface(ctrl)
+			handler := handlers.NewListHandler(repo)
+
+			tt.setupMock(repo)
+
+			w := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(w)
+
+			c.Params = gin.Params{
+				{Key: "id", Value: tt.id},
+			}
+
+			body, _ := json.Marshal(tt.requestBody)
+			c.Request = httptest.NewRequest(http.MethodPut, "/lists/"+tt.id, bytes.NewBuffer(body))
+			c.Request.Header.Set("Content-Type", "application/json")
+
+			handler.UpdateListTitle(c)
+
+			if tt.expectedStatus != w.Code {
+				t.Errorf("expected status %d, got %d. Response: %s",
+					tt.expectedStatus, w.Code, w.Body.String())
+			}
+			if tt.checkResponse != nil {
+				tt.checkResponse(t, w)
+			}
+		})
+	}
+}
